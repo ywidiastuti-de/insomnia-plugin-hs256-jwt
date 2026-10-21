@@ -1,6 +1,6 @@
 # insomnia-plugin-hs256-jwt
 
-An [Insomnia](https://insomnia.rest) template tag that generates an **HS256 JWT** signed with a shared secret, fresh on every request.
+An [Insomnia](https://insomnia.rest) template tag that generates an **HS256 JWT**, fresh on every request. The signing secret is read directly from your local fault credentials, the same files used by [insomnia-plugin-fault-variables](https://insomnia.rest/plugins/insomnia-plugin-fault-variables), so it never has to be stored in your Insomnia workspace.
 
 ## Install
 
@@ -12,13 +12,14 @@ In any request field (for example an `Authorization` header), press `Ctrl+Space`
 
 | Option | Description |
 | --- | --- |
-| Secret Source | **Value**: type the secret or reference an environment variable such as `{{ _.jwtSecret }}`. **Properties file**: read it from a `.properties` file on disk. |
-| Secret | The signing secret (Value source only). |
-| Properties File | Path to the `.properties` file; `~` expands to your home directory (Properties file source only). |
-| Secret Property | Key of the secret in that file, e.g. `jwt.secret` (Properties file source only). |
-| Secret Encoding | `UTF-8` uses the secret as-is. `Base64` decodes it first, which is common for Spring Boot services. |
+| Fault Project | Fault project ID, e.g. `com.example.app:api`. |
+| Fault Filepath | Path within the fault project, e.g. `local/.properties`. |
+| Secret Property | Key of the signing secret in that file, e.g. `jwt.secret`. |
+| Tenant ID | Value for the `tenant_id` claim. Leave empty to leave the claim out. |
 | Expiry (seconds) | Lifetime of the token. Default `3600`. |
-| Extra Claims (JSON) | A JSON object merged into the payload, e.g. `{"sub": "user-1", "tenant_id": "acme"}`. |
+| Secret Encoding | `UTF-8` uses the secret as-is. `Base64` decodes it first, which is common for Spring Boot services. |
+
+Every text option also accepts an environment variable, e.g. `{{ _.project }}` or `{{ _['property-jwt-secret'] }}`.
 
 Example header:
 
@@ -26,20 +27,23 @@ Example header:
 Authorization: Bearer <HS256 JWT tag>
 ```
 
+### Where the secret is read from
+
+```
+~/.fault/<Fault Project>/<Fault Filepath>
+```
+
+On Windows, colons are removed from the project ID (`com.example.app:api` → `com.example.appapi`), matching insomnia-plugin-fault-variables. The file is a standard `.properties` file:
+
+```properties
+jwt.secret=change-me
+```
+
 ### Generated token
 
 - Header: `{"alg": "HS256", "typ": "JWT"}`
-- Payload: your extra claims plus `iat` and `exp`.
+- Payload: `tenant_id` (if set), `iat` and `exp`.
 - `iat` is backdated by 60 seconds so a server whose clock runs slightly behind does not reject the token as issued in the future.
-
-### Keeping secrets out of your workspace
-
-Using the **Properties file** source keeps the secret out of your Insomnia workspace and exports. Example file:
-
-```properties
-# ~/secrets/app.properties
-jwt.secret=change-me
-```
 
 ## Author
 

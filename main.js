@@ -34,78 +34,60 @@ function base64url(buffer) {
     .replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_');
 }
 
-function expandHome(filepath) {
-  if (filepath === '~') return os.homedir();
-  if (filepath.startsWith('~/') || filepath.startsWith('~\\')) {
-    return path.join(os.homedir(), filepath.slice(2));
-  }
-  return filepath;
-}
+function readFaultSecret(project, filepath, property) {
+  const homeDir = os.homedir();
+  const isWindows = os.platform() === 'win32';
 
-function readSecretFromFile(filepath, property) {
-  const fullPath = expandHome(filepath);
-  if (!fs.existsSync(fullPath)) {
-    throw new Error(`Secret file not found: ${fullPath}`);
+  // Windows: colons are invalid in paths — strip them (matches insomnia-plugin-fault-variables)
+  const resolvedProject = isWindows ? project.replace(/:/g, '') : project;
+
+  const credPath = path.join(homeDir, '.fault', resolvedProject, filepath);
+  if (!fs.existsSync(credPath)) {
+    throw new Error(`Fault credentials not found: ${credPath}`);
   }
-  const props = propertiesReader({ sourceFile: fullPath });
+
+  const props = propertiesReader({ sourceFile: credPath });
   const value = props.get(property);
   if (value === null || value === undefined) {
-    throw new Error(`Property "${property}" not found in ${fullPath}`);
+    throw new Error(`Property "${property}" not found in ${credPath}`);
   }
   return String(value);
 }
-
-function parseClaims(claimsJson) {
-  if (!claimsJson || !claimsJson.trim()) return {};
-  let claims;
-  try {
-    claims = JSON.parse(claimsJson);
-  } catch (e) {
-    throw new Error(`Extra claims must be valid JSON: ${e.message}`);
-  }
-  if (claims === null || typeof claims !== 'object' || Array.isArray(claims)) {
-    throw new Error('Extra claims must be a JSON object, e.g. {"sub": "user-1"}');
-  }
-  return claims;
-}
-
-const isFileSource = args => args[0] && args[0].value === 'file';
 
 module.exports.templateTags = [
   {
     name: 'hs256jwt',
     displayName: 'HS256 JWT',
-    description: 'Generate an HS256 JWT signed with a shared secret',
+    description: 'Generate an HS256 JWT — reads signing secret directly from fault credentials',
     args: [
       {
-        displayName: 'Secret Source',
-        type: 'enum',
-        options: [
-          { displayName: 'Value (type it or use an environment variable)', value: 'value' },
-          { displayName: 'Properties file', value: 'file' },
-        ],
-        defaultValue: 'value',
-      },
-      {
-        displayName: 'Secret',
-        description: 'The signing secret, e.g. {{ _.jwtSecret }}',
+        displayName: 'Fault Project',
+        description: 'Fault project ID, e.g. com.example.app:api',
         type: 'string',
         defaultValue: '',
-        hide: isFileSource,
       },
       {
-        displayName: 'Properties File',
-        description: 'Path to a .properties file; ~ expands to your home directory',
+        displayName: 'Fault Filepath',
+        description: 'Path within the fault project, e.g. local/.properties',
         type: 'string',
-        defaultValue: '~/secrets/app.properties',
-        hide: args => !isFileSource(args),
+        defaultValue: 'local/.properties',
       },
       {
         displayName: 'Secret Property',
-        description: 'Key of the signing secret inside the properties file',
+        description: 'Property key for the JWT signing secret',
         type: 'string',
         defaultValue: 'jwt.secret',
-        hide: args => !isFileSource(args),
+      },
+      {
+        displayName: 'Tenant ID',
+        description: 'Value of the tenant_id claim; leave empty to omit the claim',
+        type: 'string',
+        defaultValue: '',
+      },
+      {
+        displayName: 'Expiry (seconds)',
+        type: 'number',
+        defaultValue: 3600,
       },
       {
         displayName: 'Secret Encoding',
@@ -117,31 +99,18 @@ module.exports.templateTags = [
         ],
         defaultValue: 'utf8',
       },
-      {
-        displayName: 'Expiry (seconds)',
-        type: 'number',
-        defaultValue: 3600,
-      },
-      {
-        displayName: 'Extra Claims (JSON)',
-        description: 'Claims added to the payload, e.g. {"sub": "user-1", "tenant_id": "acme"}',
-        type: 'string',
-        defaultValue: '{}',
-      },
     ],
-    async run(context, source, secret, filepath, secretProperty, secretEncoding, expiresIn, claimsJson) {
-      let secretStr;
-      if (source === 'file') {
-        filepath = resolveRef(context, filepath);
-        secretProperty = resolveRef(context, secretProperty);
-        if (!filepath) throw new Error('Properties file is required');
-        if (!secretProperty) throw new Error('Secret property is required');
-        secretStr = readSecretFromFile(filepath, secretProperty);
-      } else {
-        secretStr = resolveRef(context, secret);
-        if (!secretStr) throw new Error('Secret is required');
-      }
+    async run(context, project, filepath, secretProperty, tenantId, expiresIn, secretEncoding) {
+      project = resolveRef(context, project);
+      filepath = resolveRef(context, filepath);
+      secretProperty = resolveRef(context, secretProperty);
+      tenantId = resolveRef(context, tenantId);
 
+      if (!project) throw new Error('Fault project is required');
+      if (!filepath) throw new Error('Fault filepath is required');
+      if (!secretProperty) throw new Error('Secret property is required');
+
+      const secretStr = readFaultSecret(project, filepath, secretProperty);
       const secretKey = (secretEncoding === 'base64')
         ? Buffer.from(secretStr, 'base64')
         : secretStr;
@@ -152,7 +121,7 @@ module.exports.templateTags = [
       // they consider to be in the future, which happens when the token is sent
       // in the same instant it is generated.
       const payload = {
-        ...parseClaims(claimsJson),
+        ...(tenantId ? { tenant_id: tenantId } : {}),
         iat: now - CLOCK_SKEW_LEEWAY,
         exp: now + Number(expiresIn || 3600),
       };

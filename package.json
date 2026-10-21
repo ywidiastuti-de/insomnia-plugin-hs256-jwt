@@ -23,7 +23,7 @@
   "insomnia": {
     "name": "hs256-jwt",
     "displayName": "HS256 JWT",
-    "description": "Generate an HS256 JWT signed with a shared secret, read from a value, an environment variable, or a .properties file",
+    "description": "Generate an HS256 JWT signed with a secret read from your local fault credentials",
     "publisher": {
       "name": "Yuni Widiastuti"
     }
