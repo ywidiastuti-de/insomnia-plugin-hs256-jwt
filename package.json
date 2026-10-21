@@ -1,0 +1,35 @@
+{
+  "name": "insomnia-plugin-hs256-jwt",
+  "version": "1.0.0",
+  "description": "Insomnia template tag that generates an HS256 JWT signed with a shared secret",
+  "author": "Yuni Widiastuti <yuni.widiastuti@gmail.com>",
+  "license": "MIT",
+  "main": "main.js",
+  "keywords": [
+    "insomnia",
+    "insomnia-plugin",
+    "jwt",
+    "hs256",
+    "template-tag"
+  ],
+  "insomnia": {
+    "name": "hs256-jwt",
+    "displayName": "HS256 JWT",
+    "description": "Generate an HS256 JWT signed with a shared secret, read from a value, an environment variable, or a .properties file",
+    "publisher": {
+      "name": "Yuni Widiastuti"
+    }
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org",
+    "access": "public"
+  },
+  "files": [
+    "main.js",
+    "README.md",
+    "LICENSE"
+  ],
+  "dependencies": {
+    "properties-reader": "^3.0.1"
+  }
+}
