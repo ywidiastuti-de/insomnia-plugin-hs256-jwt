@@ -4,6 +4,14 @@
   "description": "Insomnia template tag that generates an HS256 JWT signed with a shared secret",
   "author": "Yuni Widiastuti <yuni.widiastuti@gmail.com>",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ywidiastuti-de/insomnia-plugin-hs256-jwt.git"
+  },
+  "homepage": "https://github.com/ywidiastuti-de/insomnia-plugin-hs256-jwt#readme",
+  "bugs": {
+    "url": "https://github.com/ywidiastuti-de/insomnia-plugin-hs256-jwt/issues"
+  },
   "main": "main.js",
   "keywords": [
     "insomnia",
